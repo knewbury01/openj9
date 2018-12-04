@@ -1249,8 +1249,8 @@ void printMethodName(J9Method *method)
    J9UTF8 *name;
    J9UTF8 *signature;
    getClassNameSignatureFromMethod(method, className, name, signature);
-   printf("---------------------------");
-   printf("%.*s.%.*s%.*s", J9UTF8_LENGTH(className), (char *) J9UTF8_DATA(className),
+   printf("---------------------------\n");
+   printf("%.*s.%.*s%.*s\n", J9UTF8_LENGTH(className), (char *) J9UTF8_DATA(className),
                                          J9UTF8_LENGTH(name), (char *) J9UTF8_DATA(name),
                                          J9UTF8_LENGTH(signature), (char *) J9UTF8_DATA(signature));
    }
@@ -6931,6 +6931,7 @@ TR::CompilationInfoPerThreadBase::compile(J9VMThread * vmThread,
    return startPC;
    }
 
+
 // static method
 TR_MethodMetaData *
 TR::CompilationInfoPerThreadBase::wrappedCompile(J9PortLibrary *portLib, void * opaqueParameters)
@@ -7483,7 +7484,13 @@ TR::CompilationInfoPerThreadBase::wrappedCompile(J9PortLibrary *portLib, void * 
             {
 	      //check if aot, if so begin predictor interactions
 	      if(aotflag){
+		printf("CONSTRUCT iterator\n");
 	      TR_J9ByteCodeIterator bci(0, static_cast<TR_ResolvedJ9Method *> (compilee), static_cast<TR_J9VMBase *> (vm), TR::comp());
+
+	      for (TR_J9ByteCode bc = bci.first(); bc != J9BCunknown; bc = bci.next()){
+		  bci.printByteCode();
+		  printf("found byte\n");
+		}
 	      }
             // Check if the the method to be compiled is a JSR292 method
             if (TR::CompilationInfo::isJSR292(details.getMethod()))
