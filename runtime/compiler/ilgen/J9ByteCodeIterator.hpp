@@ -144,7 +144,8 @@ public:
    int16_t  next2BytesSigned(int32_t o = 1)       { return next2Bytes(o); }
    int32_t  next4BytesSigned(int32_t o = 1)       { return next4Bytes(o); }
 #endif
-
+     void printByteCode();
+     
 protected:
    void stepOverVariableSizeBC();
 
@@ -156,7 +157,6 @@ protected:
    void printJumpIndex(int32_t offset);
 
    void printByteCodePrologue();
-   void printByteCode();
    void printByteCodeEpilogue();
 
    TR_J9VMBase *fe()             { return _fe; }

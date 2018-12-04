@@ -92,6 +92,8 @@
 #include "env/J9SegmentCache.hpp"
 #include "env/SystemSegmentProvider.hpp"
 #include "env/DebugSegmentProvider.hpp"
+#include "ilgen/J9ByteCode.hpp"
+#include "ilgen/J9ByteCodeIterator.hpp"
 
 #if defined(J9VM_OPT_SHARED_CLASSES)
 #include "j9jitnls.h"
@@ -1236,6 +1238,19 @@ void TR::CompilationInfo::printMethodNameToVlog(J9Method *method)
    J9UTF8 *signature;
    getClassNameSignatureFromMethod(method, className, name, signature);
    TR_VerboseLog::write("%.*s.%.*s%.*s", J9UTF8_LENGTH(className), (char *) J9UTF8_DATA(className),
+                                         J9UTF8_LENGTH(name), (char *) J9UTF8_DATA(name),
+                                         J9UTF8_LENGTH(signature), (char *) J9UTF8_DATA(signature));
+   }
+
+// a sort of copy for just printing to stdout                                                                                                                                                                               
+void printMethodName(J9Method *method)
+   {
+   J9UTF8 *className;
+   J9UTF8 *name;
+   J9UTF8 *signature;
+   getClassNameSignatureFromMethod(method, className, name, signature);
+   printf("---------------------------");
+   printf("%.*s.%.*s%.*s", J9UTF8_LENGTH(className), (char *) J9UTF8_DATA(className),
                                          J9UTF8_LENGTH(name), (char *) J9UTF8_DATA(name),
                                          J9UTF8_LENGTH(signature), (char *) J9UTF8_DATA(signature));
    }
@@ -6381,6 +6396,23 @@ TR::CompilationInfoPerThreadBase::preCompilationTasks(J9VMThread * vmThread,
 #if defined(J9VM_INTERP_AOT_COMPILE_SUPPORT)
    if (_vm->isAOT_DEPRECATED_DO_NOT_USE())
       {
+	//printMethodName(method);
+	//printf("FOUND AOT COMPILE: \n");
+	//small test
+	//const uint8_t * _code = method->bytecodes;
+	int i = 0;
+	//	TR::Compilation* comp = TR::comp();
+	//TR_ResolvedMethod *compilee = vm->createResolvedMethod(compiler->trMemory(), (TR_OpaqueMethodBlock *)method);
+	//TR_ResolvedMethod *resolvedMethod = _vm->createResolvedMethod(&trMemory, (TR_OpaqueMethodBlock *)entry);
+	//TR_J9ByteCodeIterator bci(0, static_cast<TR_ResolvedJ9Method *> (resolvedMethod), static_cast<TR_J9VMBase *> (comp->fej9()), comp);
+	/*TR_J9ByteCode bc = bci.first(), nextBC;
+	for (; bc != J9BCunknown; bc = bci.next())
+	 {
+	i++;
+       uint32_t bcindex = bci.bcIndex();
+	  //  TR_J9ByteCodeIterator::convertOpCodeToByteCodeEnum(_code[i++]);
+	  }*/
+	//printf("FORTHISMETHOD: %d\n", i);  
       entry->_useAotCompilation = true;
       // In some circumstances AOT compilations are performed at warm
       if (TR::Options::getCmdLineOptions()->getAggressivityLevel() == TR::Options::AGGRESSIVE_AOT &&
@@ -7066,10 +7098,18 @@ TR::CompilationInfoPerThreadBase::wrappedCompile(J9PortLibrary *portLib, void * 
                }
             }
 
+	 int aotflag =0;
          // Adjust Options for AOT compilation
          if (that->_methodBeingCompiled->_useAotCompilation)
             {
-            options->setOption(TR_AOT);
+	      //testinghere
+	      J9Method* method = that->_methodBeingCompiled->getMethodDetails().getMethod();
+	      printMethodName(method);
+        printf("FOUND AOT COMPILE: \n");  
+	//	TR_J9ByteCodeIterator bci(0, static_cast<TR_ResolvedJ9Method *> (compilee), static_cast<TR_J9VMBase *> (comp->fej9()), comp);
+	//TR_J9ByteCodeIterator::initialize(0, static_cast<TR_ResolvedJ9Method *> (compilee), static_cast<TR_J9VMBase *> (vm), compiler);
+	aotflag =1;
+	options->setOption(TR_AOT);
 
             // Disable dynamic literal pool for AOT because of an unresolved data snippet patching issue in which
             // the "Address Of Ref. Instruction" in the unresolved data snippet points to the wrong load instruction
@@ -7441,6 +7481,10 @@ TR::CompilationInfoPerThreadBase::wrappedCompile(J9PortLibrary *portLib, void * 
 
          if (compiler)
             {
+	      //check if aot, if so begin predictor interactions
+	      if(aotflag){
+	      TR_J9ByteCodeIterator bci(0, static_cast<TR_ResolvedJ9Method *> (compilee), static_cast<TR_J9VMBase *> (vm), TR::comp());
+	      }
             // Check if the the method to be compiled is a JSR292 method
             if (TR::CompilationInfo::isJSR292(details.getMethod()))
                {
