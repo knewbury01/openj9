@@ -1242,6 +1242,148 @@ void TR::CompilationInfo::printMethodNameToVlog(J9Method *method)
                                          J9UTF8_LENGTH(signature), (char *) J9UTF8_DATA(signature));
    }
 
+//extract features
+void extractFeatures(TR_ResolvedJ9Method * compilee, TR_J9VMBase * vm){
+
+  int arrlen = 52;
+  int arr[arrlen];
+  //can encode this as 1 since this is the val that the predictor expects as "cold" and we can try to leave the hotness for this method as cold
+  //realistically would need to get this from the method to deal with those rare AOT warms (if agressive cmdline flag is given)
+  int hotness = 1;
+  
+  //from method details?
+int numberOfExceptionHandlers = 0;
+int getNodeCount = 0;
+int numberOfParmeters = 0;
+int numberOfTemps = 0;
+int isConstructor = 0;
+int isFinal = 0;
+int isProtected = 0;
+int isPublic = 0;
+int isStatic = 0;
+int isSynchronized = 0;
+int isStrictFP = 0;
+int virtualMethodIsOverridden = 0;
+int hasManyIterationsLoops = 0;
+int containsBigDecimalLoad = 0;
+int hasFloatingPoint = 0;
+int hasNews = 0;
+int hasUnsafeSymbol = 0;
+int mayHaveLoops = 0;
+//counts
+ int BCF_type_notype = 0;
+int BCF_type_byte = 0;
+int BCF_type_char = 0;
+int BCF_type_short = 0;
+int BCF_type_int = 0;
+int BCF_type_long = 0;
+int BCF_type_float = 0;
+int BCF_type_double = 0;
+int BCF_type_longdouble = 0;
+int BCF_type_address = 0;
+int BCF_type_object = 0;
+int BCF_type_packed = 0;
+int BCF_type_zoned = 0;
+int BCF_type_mixed = 0;
+ int BCF_arr_ops=0;     // Internal array operations: copy, store,translate, ...
+ int BCF_branch = 0;
+int BCF_call = 0;
+int BCF_cast = 0;
+int BCF_inst_load = 0;
+int BCF_inst_loadconst = 0;
+int BCF_inst_store = 0;
+ int BCF_inst_simple_alu=0; // Simple ALU operations = 0;
+int BCF_inst_mul = 0;
+int BCF_inst_div = 0;
+int BCF_inst_rem = 0;
+int BCF_inst_compare = 0;
+int BCF_il_instanceof = 0;
+ int BCF_il_synch =0;// Synchronized = 0;
+int BCF_il_throw = 0;
+ int BCF_new_obj =0;// New object = 0;
+  int BCF_new_arr =0;// New array = 0;
+  int BCF_new_multiarr = 0;// New multi-dimensional array = 0;
+ int BCF_oper_misc = 0; // miscellaneous operation not covered elsewhere = 0;
+  
+  TR_J9ByteCodeIterator bci(0, compilee, vm, TR::comp());
+
+  //iterate over all bytes in the method
+  for (TR_J9ByteCode bc = bci.first(); bc != J9BCunknown; bc = bci.next()){
+    uint8_t opcode = bci.nextByte(0);
+    //uncertain if this conversion will be alright for performance, makes writing this easier to group for case detection, but may harm performance
+    TR_J9ByteCode op = bci.convertOpCodeToByteCodeEnum(opcode);
+
+		//increment counters for types
+		switch(op){
+         	  
+
+
+		}
+	      }
+
+	      //finally build the feature vector, is it better to actually do this in a loop? but then we have to have some idea of which int at each indx
+
+	     arr[0]=hotness;
+arr[1]= numberOfExceptionHandlers;
+arr[2]= getNodeCount;
+arr[3]= numberOfParmeters;
+arr[4]= numberOfTemps;
+arr[5]= isConstructor;
+arr[6]= isFinal;
+arr[7]= isProtected;
+arr[8]= isPublic;
+arr[9]= isStatic;
+arr[10]= isSynchronized;
+arr[11]= isStrictFP;
+arr[12]= virtualMethodIsOverridden;
+arr[13]= hasManyIterationsLoops;
+arr[14]= containsBigDecimalLoad;
+arr[15]= hasFloatingPoint;
+arr[16]= hasNews;
+arr[17]= hasUnsafeSymbol;
+arr[18]= mayHaveLoops;
+arr[19]= BCF_type_notype;
+arr[20]= BCF_type_byte;
+arr[21]= BCF_type_char;
+arr[22]= BCF_type_short;
+arr[23]= BCF_type_int;
+arr[24]= BCF_type_long;
+arr[25]= BCF_type_float;
+arr[26]= BCF_type_double;
+arr[27]= BCF_type_longdouble;
+arr[28]= BCF_type_address;
+arr[29]= BCF_type_object;
+arr[30]= BCF_type_packed;
+arr[31]= BCF_type_zoned;
+arr[32]= BCF_type_mixed;
+arr[33]= BCF_arr_ops;
+arr[34]= BCF_branch;
+arr[35]= BCF_call;
+arr[36]= BCF_cast;
+arr[37]= BCF_inst_load;
+arr[38]= BCF_inst_loadconst;
+arr[39]= BCF_inst_store;
+arr[40]= BCF_inst_simple_alu;
+arr[41]= BCF_inst_mul;
+arr[42]= BCF_inst_div;
+arr[43]= BCF_inst_rem;
+arr[44]= BCF_inst_compare;
+arr[45]= BCF_il_instanceof;
+arr[46]= BCF_il_synch ;
+arr[47]=BCF_il_throw;
+arr[48]= BCF_new_obj;
+arr[49]= BCF_new_arr;
+arr[50]= BCF_new_multiarr;
+arr[51]= BCF_oper_misc;
+	      
+
+//testing contents of feature vector
+/*printf("Array:");
+for(int i=0; i < arrlen; i++){
+  printf("%d\n," arr[i]);
+  }*/
+}
+
 // a sort of copy for just printing to stdout                                                                                                                                                                               
 void printMethodName(J9Method *method)
    {
@@ -7485,12 +7627,15 @@ TR::CompilationInfoPerThreadBase::wrappedCompile(J9PortLibrary *portLib, void * 
 	      //check if aot, if so begin predictor interactions
 	      if(aotflag){
 		printf("CONSTRUCT iterator\n");
-	      TR_J9ByteCodeIterator bci(0, static_cast<TR_ResolvedJ9Method *> (compilee), static_cast<TR_J9VMBase *> (vm), TR::comp());
+
+		extractFeatures(static_cast<TR_ResolvedJ9Method *> (compilee), static_cast<TR_J9VMBase *> (vm));
+		
+		/*	      TR_J9ByteCodeIterator bci(0, static_cast<TR_ResolvedJ9Method *> (compilee), static_cast<TR_J9VMBase *> (vm), TR::comp());
 
 	      for (TR_J9ByteCode bc = bci.first(); bc != J9BCunknown; bc = bci.next()){
 		  bci.printByteCode();
 		  printf("found byte\n");
-		}
+		  }*/
 	      }
             // Check if the the method to be compiled is a JSR292 method
             if (TR::CompilationInfo::isJSR292(details.getMethod()))
