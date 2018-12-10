@@ -1242,88 +1242,346 @@ void TR::CompilationInfo::printMethodNameToVlog(J9Method *method)
                                          J9UTF8_LENGTH(signature), (char *) J9UTF8_DATA(signature));
    }
 
-//extract features
-void extractFeatures(TR_ResolvedJ9Method * compilee, TR_J9VMBase * vm){
+//featureExtraction
+void featureExtraction(TR_ResolvedJ9Method * compilee, TR_J9VMBase * vm){
 
+  //init all ints/array for feature vector
   int arrlen = 52;
   int arr[arrlen];
-  //can encode this as 1 since this is the val that the predictor expects as "cold" and we can try to leave the hotness for this method as cold
-  //realistically would need to get this from the method to deal with those rare AOT warms (if agressive cmdline flag is given)
-  int hotness = 1;
-  
-  //from method details?
-int numberOfExceptionHandlers = 0;
-int getNodeCount = 0;
-int numberOfParmeters = 0;
-int numberOfTemps = 0;
-int isConstructor = 0;
-int isFinal = 0;
-int isProtected = 0;
-int isPublic = 0;
-int isStatic = 0;
-int isSynchronized = 0;
-int isStrictFP = 0;
-int virtualMethodIsOverridden = 0;
-int hasManyIterationsLoops = 0;
-int containsBigDecimalLoad = 0;
-int hasFloatingPoint = 0;
-int hasNews = 0;
-int hasUnsafeSymbol = 0;
-int mayHaveLoops = 0;
-//counts
- int BCF_type_notype = 0;
-int BCF_type_byte = 0;
-int BCF_type_char = 0;
-int BCF_type_short = 0;
-int BCF_type_int = 0;
-int BCF_type_long = 0;
-int BCF_type_float = 0;
-int BCF_type_double = 0;
-int BCF_type_longdouble = 0;
-int BCF_type_address = 0;
-int BCF_type_object = 0;
-int BCF_type_packed = 0;
-int BCF_type_zoned = 0;
-int BCF_type_mixed = 0;
- int BCF_arr_ops=0;     // Internal array operations: copy, store,translate, ...
- int BCF_branch = 0;
-int BCF_call = 0;
-int BCF_cast = 0;
-int BCF_inst_load = 0;
-int BCF_inst_loadconst = 0;
-int BCF_inst_store = 0;
- int BCF_inst_simple_alu=0; // Simple ALU operations = 0;
-int BCF_inst_mul = 0;
-int BCF_inst_div = 0;
-int BCF_inst_rem = 0;
-int BCF_inst_compare = 0;
-int BCF_il_instanceof = 0;
- int BCF_il_synch =0;// Synchronized = 0;
-int BCF_il_throw = 0;
- int BCF_new_obj =0;// New object = 0;
-  int BCF_new_arr =0;// New array = 0;
-  int BCF_new_multiarr = 0;// New multi-dimensional array = 0;
- int BCF_oper_misc = 0; // miscellaneous operation not covered elsewhere = 0;
-  
-  TR_J9ByteCodeIterator bci(0, compilee, vm, TR::comp());
+ int BCF_type_notype=0;
+int BCF_type_byte=0;
+int BCF_type_char=0;
+int BCF_type_short=0;
+int BCF_type_int=0;
+int BCF_type_long=0;
+int BCF_type_float=0;
+int BCF_type_double=0;
+int BCF_type_longdouble=0;
+int BCF_type_address=0;
+int BCF_type_object=0;
+int BCF_type_packed=0;
+int BCF_type_zoned=0;
+int BCF_type_mixed=0;
+int BCF_arr_ops=0;
+int BCF_branch=0;
+int BCF_call=0;
+int BCF_cast=0;
+int BCF_inst_load=0;
+int BCF_inst_loadconst=0;
+int BCF_inst_store=0;
+int BCF_inst_simple_alu=0;
+int BCF_inst_mul=0;
+int BCF_inst_div=0;
+int BCF_inst_rem=0;
+int BCF_inst_compare=0;
+int BCF_il_instanceof=0;
+int BCF_il_synch =0;
+int BCF_il_throw=0;
+int BCF_new_obj=0;
+int BCF_new_arr=0;
+int BCF_new_multiarr=0;
+int BCF_oper_misc=0;
 
-  //iterate over all bytes in the method
+  //set the scalar quantities
+        int hasFloatingPoint = 0;
+        int numberOfExceptionHandlers = compilee->numberOfExceptionHandlers();
+        int numberOfParmeters  = compilee->numberOfParameters();
+        int numberOfTemps = compilee->numberOfTemps();
+        int isConstructor = compilee->isConstructor();
+        int isFinal = compilee->isFinal();
+        int isProtected = compilee->isProtected();
+        int isPublic = compilee->isPrivate();
+        int isStatic = compilee->isStatic();
+        int isSynchronized = compilee->isSynchronized();
+        int isStrictFP = compilee->isStrictFP();
+        int virtualMethodIsOverridden = compilee->virtualMethodIsOverridden();
+	int getNodeCount = TR::comp()->getNodeCount();
+	int containsBigDecimalLoad =  TR::comp()->containsBigDecimalLoad();
+        int hasNews = TR::comp()->hasNews();
+        int hasUnsafeSymbol = TR::comp()->hasUnsafeSymbol();
+        int mayHaveLoops = TR::comp()->mayHaveLoops();
+
+	//one scalar that I dont know how to collect
+	int hasManyIterationsLoops = 0;
+	
+  //get iterator for distributions
+  //can use comp() bc of assert before this fxn call
+  TR_J9ByteCodeIterator bci(0, static_cast<TR_ResolvedJ9Method *> (compilee), static_cast<TR_J9VMBase *> (v\
+m), TR::comp());
   for (TR_J9ByteCode bc = bci.first(); bc != J9BCunknown; bc = bci.next()){
-    uint8_t opcode = bci.nextByte(0);
-    //uncertain if this conversion will be alright for performance, makes writing this easier to group for case detection, but may harm performance
-    TR_J9ByteCode op = bci.convertOpCodeToByteCodeEnum(opcode);
 
-		//increment counters for types
-		switch(op){
-         	  
+    //this was a test, leave for now just in case
+    //bci.printByteCode();
+    
+    switch (bci.convertOpCodeToByteCodeEnum(bc))
+         {
+         case J9BCinvokeinterface2: BCF_call++; break;
+
+         case J9BCnop:        BCF_type_notype++; break;
+
+         case J9BCaconstnull: case J9BCiconstm1:
+                  BCF_inst_loadconst++; break;
+
+         case J9BCiconst0: case J9BCiconst1: case J9BCiconst2: case J9BCiconst3: case J9BCiconst4: case J9BCiconst5:
+           BCF_inst_loadconst++; BCF_type_int++; break;
+
+         case J9BClconst0: case J9BClconst1:
+           BCF_inst_loadconst++; BCF_type_long++; break;
+
+         case J9BCfconst0: case J9BCfconst1: case J9BCfconst2:
+           BCF_inst_loadconst++; BCF_type_float++; break;
+
+         case J9BCdconst0: case J9BCdconst1:
+           BCF_inst_loadconst++; BCF_type_double++; break;
+
+         case J9BCldc:  case J9BCldcw:  case J9BCldc2lw: case J9BCldc2dw: 
+  		BCF_type_notype++; BCF_inst_loadconst++; break;
+            
+        case J9BCiload0: case J9BCiload1: case J9BCiload2: case J9BCiload3:
+           BCF_inst_load++; BCF_type_int++; break;
+
+	   
+  case J9BClload0: case J9BClload1: case J9BClload2: case J9BClload3:
+    BCF_inst_load++; BCF_type_long++; break;
+
+  case J9BCfload0: case J9BCfload1: case J9BCfload2: case J9BCfload3:
+    BCF_inst_load++; BCF_type_float++; break;
+
+  case J9BCdload0: case J9BCdload1: case J9BCdload2: case J9BCdload3:
+    BCF_inst_load++; BCF_type_double++; break;
+
+  case J9BCaload0: case J9BCaload1: case J9BCaload2: case J9BCaload3:
+    BCF_inst_load++; BCF_type_address++; break;
 
 
-		}
-	      }
+  case J9BCiaload: BCF_type_int++ ;BCF_inst_load++; break;
+  case J9BClaload:    BCF_type_long++; BCF_inst_load++; break;
+  case J9BCfaload:    BCF_type_float++; BCF_inst_load++; break;
+  case J9BCdaload:  BCF_type_double++; BCF_inst_load++; break;
+  case J9BCaaload: BCF_type_address++; BCF_inst_load++; break;
+  case J9BCbaload:   BCF_type_byte++; BCF_inst_load++; break;
+  case J9BCcaload: BCF_type_char++; BCF_inst_load++; break;
+  case J9BCsaload: BCF_type_short++; BCF_inst_load++; break;
 
-	      //finally build the feature vector, is it better to actually do this in a loop? but then we have to have some idea of which int at each indx
+  case J9BCiloadw:  BCF_type_int++ ; BCF_inst_load++; break;
+  case J9BClloadw:  BCF_type_long++; BCF_inst_load++; break;
+  case J9BCfloadw: BCF_type_float++; BCF_inst_load++; break;
+  case J9BCdloadw: BCF_type_double++; BCF_inst_load++; break;
+  case J9BCaloadw: BCF_type_address++; BCF_inst_load++; break;
 
-	     arr[0]=hotness;
+	 case J9BCbipush: BCF_type_byte++; BCF_inst_loadconst++; break;
+	 case J9BCsipush: BCF_type_short++; BCF_inst_loadconst++; break;
+
+  case J9BCiload:  BCF_type_int++ ; BCF_inst_load++; break;
+  case J9BClload:  BCF_type_long++; BCF_inst_load++; break;
+  case J9BCfload:  BCF_type_float++; BCF_inst_load++; break;
+  case J9BCdload:  BCF_type_double++; BCF_inst_load++; break;
+  case J9BCaload:  BCF_type_address++; BCF_inst_load++; break;
+
+  case J9BCistore: BCF_type_int++ ;BCF_inst_store++; break;
+  case J9BClstore: BCF_type_long++;BCF_inst_store++; break;
+  case J9BCfstore: BCF_type_float++;BCF_inst_store++; break;
+  case J9BCdstore: BCF_type_double++;BCF_inst_store++; break;
+  case J9BCastore: BCF_type_address++;BCF_inst_store++; break;
+
+  case J9BCistore0:case J9BCistore1: case J9BCistore2: case J9BCistore3:
+    BCF_type_int++ ; BCF_inst_store++; break;
+
+
+  case J9BClstore0:case J9BClstore1: case J9BClstore2: case J9BClstore3:
+    BCF_type_long++ ; BCF_inst_store++;  break;
+
+
+  case J9BCfstore0: case J9BCfstore1: case J9BCfstore2: case J9BCfstore3:
+    BCF_type_float++ ; BCF_inst_store++; break;
+
+
+  case J9BCdstore0: case J9BCdstore1: case J9BCdstore2: case J9BCdstore3:
+    BCF_type_double++ ; BCF_inst_store++; break;
+
+
+  case J9BCastore0: case J9BCastore1: case J9BCastore2: case J9BCastore3:
+    BCF_type_address++; BCF_inst_store++; break;
+
+
+  case J9BCiastore:                  BCF_type_int++ ; BCF_inst_store++; break;
+  case J9BClastore:                   BCF_type_long++ ;  BCF_inst_store++; break;
+  case J9BCfastore:                   BCF_type_float++ ; BCF_inst_store++; break;
+  case J9BCdastore:                   BCF_type_double++ ; BCF_inst_store++; break;
+  case J9BCaastore:                  BCF_type_address++; BCF_inst_store++; break;
+  case J9BCbastore: BCF_type_byte++;  BCF_inst_store++; break;
+  case J9BCcastore: BCF_type_char++; BCF_inst_store++; break;
+  case J9BCsastore:  BCF_type_short++;    BCF_inst_store++; break;
+
+  case J9BCistorew: BCF_type_int++ ; BCF_inst_store++; break;
+  case J9BClstorew:  BCF_type_long++ ;  BCF_inst_store++; break;
+  case J9BCfstorew: BCF_type_float++ ; BCF_inst_store++; break;
+  case J9BCdstorew: BCF_type_double++ ; BCF_inst_store++; break;
+  case J9BCastorew: BCF_type_address++; BCF_inst_store++; break;
+
+    //not sure, see assumptions.txt
+  case J9BCpop:    BCF_oper_misc++; BCF_type_mixed++; break;
+  case J9BCpop2:   BCF_oper_misc++; BCF_type_mixed++; break;
+  case J9BCdup:    BCF_oper_misc++; BCF_type_mixed++; break;
+  case J9BCdup2:   BCF_oper_misc++; BCF_type_mixed++; break;
+  case J9BCdupx1:  BCF_oper_misc++; BCF_type_mixed++; break;
+  case J9BCdup2x1: BCF_oper_misc++; BCF_type_mixed++; break;
+  case J9BCdupx2:  BCF_oper_misc++; BCF_type_mixed++; break;
+  case J9BCdup2x2: BCF_oper_misc++; BCF_type_mixed++; break;
+  case J9BCswap:   BCF_oper_misc++; BCF_type_mixed++; break;
+
+  case J9BCiadd:  BCF_type_int++ ; BCF_inst_simple_alu++; break;
+  case J9BCladd:  BCF_type_long++ ; BCF_inst_simple_alu++; break;
+  case J9BCfadd:  BCF_type_float++ ; BCF_inst_simple_alu++; break;
+  case J9BCdadd:  BCF_type_double++ ; BCF_inst_simple_alu++; break;
+
+  case J9BCisub:  BCF_type_int++ ; BCF_inst_simple_alu++; break;
+  case J9BClsub:  BCF_type_long++ ; BCF_inst_simple_alu++; break;
+  case J9BCfsub:  BCF_type_float++ ; BCF_inst_simple_alu++; break;
+  case J9BCdsub:  BCF_type_double++ ; BCF_inst_simple_alu++; break;
+
+  case J9BCimul:  BCF_type_int++ ; BCF_inst_mul++; break;
+  case J9BClmul:  BCF_type_long++ ; BCF_inst_mul++; break;
+  case J9BCfmul:  BCF_type_float++ ; BCF_inst_mul++; break;
+  case J9BCdmul:  BCF_type_double++ ; BCF_inst_mul++; break;
+
+  case J9BCidiv:  BCF_type_int++ ;BCF_inst_div++; break;
+  case J9BCldiv:  BCF_type_long++ ; BCF_inst_div++; break;
+
+  case J9BCirem:  BCF_type_int++ ; BCF_inst_rem++; break;
+  case J9BClrem:  BCF_type_long++ ; BCF_inst_rem++; break;
+
+  case J9BCfdiv:  BCF_type_float++ ; BCF_inst_div++; break;
+  case J9BCddiv:  BCF_type_long++ ; BCF_inst_div++; break;
+
+  case J9BCfrem:  BCF_type_float++ ; BCF_inst_rem++; break;
+  case J9BCdrem:  BCF_type_long++ ; BCF_inst_rem++; break;
+
+  case J9BCineg:  BCF_type_int++ ; BCF_inst_simple_alu++; break;
+  case J9BClneg:  BCF_type_long++ ; BCF_inst_simple_alu++; break;
+  case J9BCfneg:  BCF_type_float++ ; BCF_inst_simple_alu++; break;
+  case J9BCdneg:  BCF_type_double++ ; BCF_inst_simple_alu++; break;
+
+  case J9BCishl:  BCF_type_int++ ; BCF_inst_simple_alu++; break;
+  case J9BCishr:  BCF_type_int++ ; BCF_inst_simple_alu++; break;
+  case J9BCiushr: BCF_type_int++ ; BCF_inst_simple_alu++; break;
+  case J9BClshl:  BCF_type_long++ ; BCF_inst_simple_alu++; break;
+  case J9BClshr:  BCF_type_long++ ; BCF_inst_simple_alu++; break;
+  case J9BClushr: BCF_type_long++ ; BCF_inst_simple_alu++; break;
+
+  case J9BCiand:  BCF_type_int++ ; BCF_inst_simple_alu++; break;
+  case J9BCior:   BCF_type_int++ ; BCF_inst_simple_alu++; break;
+  case J9BCixor:  BCF_type_int++ ; BCF_inst_simple_alu++; break;
+  case J9BCland:  BCF_type_long++ ; BCF_inst_simple_alu++; break;
+  case J9BClor:   BCF_type_long++ ; BCF_inst_simple_alu++; break;
+  case J9BClxor:  BCF_type_long++ ; BCF_inst_simple_alu++; break;
+
+  case J9BCi2l:   BCF_type_int++ ; BCF_cast++; break;
+  case J9BCi2f:   BCF_type_int++ ; BCF_cast++; break;
+  case J9BCi2d:   BCF_type_int++ ; BCF_cast++; break;
+  case J9BCi2b:   BCF_type_int++ ; BCF_cast++;  break;
+  case J9BCi2c:   BCF_type_int++ ; BCF_cast++;  break;
+  case J9BCi2s:   BCF_type_int++ ; BCF_cast++;  break;
+
+  case J9BCl2i:   BCF_type_long++; BCF_cast++; break;
+  case J9BCl2f:   BCF_type_long++; BCF_cast++; break;
+  case J9BCl2d:   BCF_type_long++; BCF_cast++; break;
+
+  case J9BCf2i:   BCF_type_float++ ; BCF_cast++; break;
+  case J9BCf2d:   BCF_type_float++ ; BCF_cast++; break;
+
+  case J9BCd2i:   BCF_type_double++ ;  BCF_cast++; break;
+  case J9BCd2f:   BCF_type_double++ ;  BCF_cast++; break;
+  case J9BCf2l:   BCF_type_double++ ;  BCF_cast++; break;
+  case J9BCd2l:   BCF_type_double++ ;  BCF_cast++; break;
+
+
+  case J9BCinvokevirtual:  case J9BCinvokespecial: case J9BCinvokestatic: case J9BCinvokeinterface: case J9BCinvokedynamic: case J9BCinvokehandle: case J9BCinvokehandlegeneric: case J9BCinvokespecialsplit: case J9BCinvokestaticsplit:
+    BCF_call++; break;
+
+  case J9BCifeq: case J9BCifne: case J9BCiflt:  case J9BCifge: case J9BCifgt: case J9BCifle:  case J9BCifnull: case J9BCifnonnull:
+  case J9BCificmpeq: case J9BCificmpne: case J9BCificmplt: case J9BCificmpge: case J9BCificmpgt: case J9BCificmple: case J9BCifacmpeq: case J9BCifacmpne:
+    BCF_inst_compare++; BCF_branch++; break;
+
+
+  case J9BClcmp:  case J9BCfcmpl: case J9BCfcmpg: case J9BCdcmpl: case J9BCdcmpg:
+    BCF_inst_compare++; break;
+
+  case J9BCtableswitch:  case J9BClookupswitch:
+    BCF_branch++; break;
+
+  case J9BCgoto: case J9BCgotow:
+    BCF_branch++; break;
+
+  case J9BCmonitorenter:  case J9BCmonitorexit:
+    BCF_il_synch++; break;
+
+  case J9BCathrow:       BCF_il_throw++; break;
+  case J9BCarraylength:  BCF_arr_ops++; break;
+
+    //not totally sure on this one
+  case J9BCgetstatic:  BCF_type_object++; break;
+  case J9BCgetfield:   BCF_type_object++; break;
+  case J9BCputstatic:  BCF_type_object++; break;
+  case J9BCputfield:    BCF_type_object++; break;
+
+  case J9BCcheckcast: case J9BCinstanceof:
+    BCF_il_instanceof++; break;
+
+  case J9BCnew:            BCF_new_obj++; break;
+  case J9BCnewarray:        BCF_new_arr++; break;
+  case J9BCanewarray:      BCF_new_arr++; break;
+  case J9BCmultianewarray:  BCF_new_multiarr++; break;
+
+  case J9BCiinc:  case J9BCiincw:
+    BCF_type_int++ ; BCF_inst_simple_alu++; break;
+
+  case J9BCwide:
+    {
+      int32_t wopcode = bci.next();
+      TR_J9ByteCode wbc = bci.convertOpCodeToByteCodeEnum(wopcode);
+      if (wbc == J9BCiinc)
+	{ BCF_type_int++ ; BCF_inst_simple_alu++; break; }
+
+      switch (wbc)
+	{
+	case J9BCiload:  BCF_type_int++ ; BCF_inst_load++; break;
+	case J9BClload:  BCF_type_long++; BCF_inst_load++; break;
+	case J9BCfload:  BCF_type_float++; BCF_inst_load++; break;
+	case J9BCdload:  BCF_type_double++; BCF_inst_load++; break;
+	case J9BCaload:  BCF_type_address++; BCF_inst_load++; break;
+
+	case J9BCistore: BCF_type_int++ ;  BCF_inst_store++;  break;
+	case J9BClstore: BCF_type_long++; BCF_inst_store++; break;
+	case J9BCfstore: BCF_type_float++;BCF_inst_store++;  break;
+	case J9BCdstore: BCF_type_double++;BCF_inst_store++; break;
+	case J9BCastore:  BCF_type_address++;BCF_inst_store++; break;
+	default: break;
+	}
+      break;
+    }
+
+
+  case J9BCunknown:
+    BCF_oper_misc++;
+    break;
+
+  default:
+    break;
+
+	 }
+
+  }
+
+  //last scalar, if found some op for float obvs hasFloat                                                               
+  if(BCF_type_float != 0){
+    hasFloatingPoint = 1;
+  }
+  
+  //setup array to pass to predictor
+  //hotness == cold (mostly always for aot)
+  arr[0]=1;
+         
 arr[1]= numberOfExceptionHandlers;
 arr[2]= getNodeCount;
 arr[3]= numberOfParmeters;
@@ -1374,14 +1632,13 @@ arr[47]=BCF_il_throw;
 arr[48]= BCF_new_obj;
 arr[49]= BCF_new_arr;
 arr[50]= BCF_new_multiarr;
-arr[51]= BCF_oper_misc;
-	      
+arr[51]= BCF_oper_misc;	      
 
 //testing contents of feature vector
-/*printf("Array:");
+printf("Array:");
 for(int i=0; i < arrlen; i++){
-  printf("%d\n," arr[i]);
-  }*/
+  printf("%d\n", arr[i]);
+  }
 }
 
 // a sort of copy for just printing to stdout                                                                                                                                                                               
@@ -7624,18 +7881,11 @@ TR::CompilationInfoPerThreadBase::wrappedCompile(J9PortLibrary *portLib, void * 
 
          if (compiler)
             {
-	      //check if aot, if so begin predictor interactions
+	      //check if aot, if so do feature extraction then get flags from predictor
 	      if(aotflag){
-		printf("CONSTRUCT iterator\n");
+	      
+		featureExtraction(static_cast<TR_ResolvedJ9Method *> (compilee), static_cast<TR_J9VMBase *> (vm));
 
-		extractFeatures(static_cast<TR_ResolvedJ9Method *> (compilee), static_cast<TR_J9VMBase *> (vm));
-		
-		/*	      TR_J9ByteCodeIterator bci(0, static_cast<TR_ResolvedJ9Method *> (compilee), static_cast<TR_J9VMBase *> (vm), TR::comp());
-
-	      for (TR_J9ByteCode bc = bci.first(); bc != J9BCunknown; bc = bci.next()){
-		  bci.printByteCode();
-		  printf("found byte\n");
-		  }*/
 	      }
             // Check if the the method to be compiled is a JSR292 method
             if (TR::CompilationInfo::isJSR292(details.getMethod()))
