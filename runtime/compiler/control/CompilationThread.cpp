@@ -33,6 +33,7 @@
 #define snprintf _snprintf
 #endif
 
+#include <fcntl.h>
 #include "control/CompilationThread.hpp"
 
 #include <exception>
@@ -1242,6 +1243,55 @@ void TR::CompilationInfo::printMethodNameToVlog(J9Method *method)
                                          J9UTF8_LENGTH(signature), (char *) J9UTF8_DATA(signature));
    }
 
+//predictor communication
+void predictorTalk(int *arr){
+
+  int MAXBUF = 52*4;
+  //hardcode fifo names, these don't need to be flexible                                                                
+  const char      *fifoname = "/tmp/predictor";
+  const char      *fifonameres = "/tmp/predictor-results";
+  int fifofd, fiforesfd;
+  ssize_t didwrite, didread;
+  char response[MAXBUF];
+
+  //this fifo is for our requests                                                                                       
+  fifofd = open(fifoname, O_WRONLY);
+  if(fifofd < 0){
+    printf("Cannot open first fifo");
+  }else{
+    printf("Opened first fifo\n");
+
+  }
+  
+  //this fifo is for predictor responses                                                                                
+  fiforesfd = open(fifonameres, O_RDONLY);
+  if(fiforesfd < 0){
+    perror("Cannot open second fifo");
+  }else{
+    printf("Opened second fifo\n");
+    didwrite = write(fifofd, arr, MAXBUF);
+    if(didwrite < 0){
+      printf("Cannot write");
+    }else{
+      printf("Wrote to predictor, number of bytes:%u\n", didwrite);
+
+    }
+  }
+  //setup listening for predictor response                                                                              
+  didread = read(fiforesfd, response, MAXBUF);
+  if(didread < 0){
+    printf("Cannot read predictor response");
+  }else{
+    printf("Read from predictor:\n %s", response);
+  }
+
+  sleep(5);
+  close(fifofd);
+  close(fiforesfd);
+  
+
+}
+
 //featureExtraction
 void featureExtraction(TR_ResolvedJ9Method * compilee, TR_J9VMBase * vm){
 
@@ -1635,10 +1685,12 @@ arr[50]= BCF_new_multiarr;
 arr[51]= BCF_oper_misc;	      
 
 //testing contents of feature vector
-printf("Array:");
+/*printf("Array:");
 for(int i=0; i < arrlen; i++){
   printf("%d\n", arr[i]);
-  }
+  }*/
+
+ predictorTalk(arr);
 }
 
 // a sort of copy for just printing to stdout                                                                                                                                                                               
