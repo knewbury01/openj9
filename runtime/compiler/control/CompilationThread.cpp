@@ -1252,7 +1252,7 @@ void predictorTalk(int *arr){
   const char      *fifonameres = "/tmp/predictor-results";
   int fifofd, fiforesfd;
   ssize_t didwrite, didread;
-  char response[MAXBUF];
+  long int response[MAXBUF];
 
   //this fifo is for our requests                                                                                       
   fifofd = open(fifoname, O_WRONLY);
@@ -1282,7 +1282,7 @@ void predictorTalk(int *arr){
   if(didread < 0){
     printf("Cannot read predictor response");
   }else{
-    printf("Read from predictor:\n %s", response);
+    printf("Read from predictor:\n %ld", response[0]);
   }
 
   sleep(5);
