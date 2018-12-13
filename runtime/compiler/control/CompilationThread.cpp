@@ -1243,6 +1243,113 @@ void TR::CompilationInfo::printMethodNameToVlog(J9Method *method)
                                          J9UTF8_LENGTH(signature), (char *) J9UTF8_DATA(signature));
    }
 
+//buildOpts                                                                                                                                                                 
+void buildOpts(long int opts){
+  
+  long int cpopts = opts;
+
+  //can't do some of these bc they don't exist in the optimizations enum, replace with OMR::endOpts to keep indexing fine then wont actually add that                               
+  OMR::Optimizations _transformation_names[] = {
+    OMR::endOpts, //always default? I think that means that this one doesnt matter but then why is it in here?
+        OMR::andSimplification,
+	OMR::endOpts,//       "arithmeticDefUse",                                                                                                                                 
+        OMR::arraycopyTransformation,
+        OMR::endOpts, //"arrayPrivatizationGroup",                                                                                                                                
+	OMR::basicBlockExtension,
+        OMR::basicBlockOrdering,
+        OMR::endOpts, //"blockManipulationGroup",                                                                                                                                 
+        OMR::blockSplitter,
+         OMR::endOpts, //"cheapGlobalValuePropagationGroup",                                                                                                                      
+        OMR::endOpts, //"cheapTacticalGlobalRegisterAllocatorGroup",                                                                                                              
+        OMR::coldBlockOutlining,
+        OMR::endOpts, //"colouringGlobalRegisterAllocatorGroup",                                                                                                                  
+        OMR::compactLocals,
+        OMR::compactNullChecks,
+        OMR::deadTreesElimination,
+        OMR::dynamicLiteralPool,
+       OMR::endOpts, //"earlyGlobalGroup",                                                                                                                                       
+        OMR::endOpts, //"earlyLocalGroup",                                                                                                                                        
+        OMR::endOpts, //"expensiveGlobalValuePropagationGroup",                                                                                                                   
+        OMR::expressionsSimplification,
+        OMR::endOpts, //"finalGlobalGroup",                                                                                                                                       
+        OMR::endOpts, //"fpStoreReloadElimination",                                                                                                                               
+        OMR::generalLoopUnroller,
+        OMR::generalStoreSinking,
+        OMR::globalCopyPropagation,
+        OMR::globalDeadStoreElimination,
+        OMR::endOpts, //"globalDeadStoreGroup",                                                                                                                                   
+        OMR::globalLiveVariablesForGC,
+        OMR::idiomRecognition,
+        OMR::inductionVariableAnalysis,
+        OMR::endOpts, //"inlineProbes",                                                                                                                                           
+        OMR::inlining,
+        OMR::endOpts, //"lastLoopVersionerGroup",                                                                                                                                 
+        OMR::endOpts, //"lateLocalGroup",                                                                                                                                         
+        OMR::localCSE,
+        OMR::localDeadStoreElimination,
+        OMR::localReordering,
+        OMR::localValuePropagation, //from localValuePropagationGroup                                                                                                          
+        OMR::loopAliasRefiner,  //from loopAliasRefinerGroup                                                                                                                   
+        OMR::loopCanonicalization,  //from loopCanonicalizationGroup                                                                                                           
+        OMR::loopReduction,
+        OMR::loopReplicator,
+        OMR::partialRedundancyElimination, //from partialRedundancyEliminationGroup                                                                                            
+        OMR::redundantAsyncCheckRemoval,
+        OMR::rematerialization,
+        OMR::endOpts, //"sequentialLoadAndStoreColdGroup",  
+	OMR::endOpts, // "sequentialLoadAndStoreWarmGroup",
+	OMR::sequentialStoreSimplification, //from sequentialStoreSimplificationGroup
+	OMR::signExtendLoads, //from signExtendLoadsGroup
+	OMR::stringPeepholes,
+	OMR::stripMining, //from stripMiningGroup
+	OMR::tacticalGlobalRegisterAllocator, //from tacticalGlobalRegisterAllocatorGroup
+	OMR::treeSimplification,
+	OMR::endOpts, //"trivialArrayIndependenceAnalyser",
+	OMR::trivialInlining,
+	OMR::endOpts, // "veryExpensiveGlobalValuePropagationGroup",
+	OMR::virtualGuardTailSplitter,
+	OMR::endOpts, //"x10BoundsCheckEliminator"
+};
+  //two loops , one to just get the size, to statically allocate a strategy array, then one to build this thing
+  uint64_t tmp;
+  int count = 0;
+  for (int i = 1; i <= 58; i++) {
+    tmp = (opts >> i) & 0x1;
+    if (tmp && (_transformation_names[i] != OMR::endOpts)){
+      count++;
+    }
+  }
+
+  //copy opts bitvector, to ruin one counting number of set bits                                                                                                          
+  printf("Using this vector to build the opts : %ld\n", opts);
+
+  //easier to do cheap loop and statically allocate
+  OptimizationStrategy *strategy = new OptimizationStrategy[count];
+  uint64_t tmptwo;
+  int index = 0;
+  for (int i = 1; i <= 58; i++) {
+			tmptwo = (opts >> i) & 0x1;
+			//if bitset and not one that no longer exists
+			if (tmptwo && (_transformation_names[i] != OMR::endOpts)) {
+			  strategy[index]._num = _transformation_names[i];
+			  index++;
+			}
+  }
+  
+
+  printf("making this many opts: %d\n", count);
+  //  for(int i=0; i<count; i++){
+  // printf("This is an opt: %s\n", strategy[i]);
+  //}
+  //lets see if this even works
+  strategy[count]._num = OMR::endOpts;
+  strategy[count]._options = 0;
+  TR::Optimizer::setMockStrategy(strategy);
+  //optimizer()->dumpStrategy(strategy);
+  TR::Optimizer optimizer = TR::Optimizer(TR::comp(), TR::comp()->getMethodSymbol(), 0, strategy);
+              optimizer.dumpStrategy(strategy);
+}
+	
 //predictor communication
 void predictorTalk(int *arr){
 
@@ -1288,9 +1395,12 @@ void predictorTalk(int *arr){
   sleep(5);
   close(fifofd);
   close(fiforesfd);
-  
+
+  //pass the prediction to something to build a strategy and set it in the optimizer
+  buildOpts(response[0]);
 
 }
+
 
 //featureExtraction
 void featureExtraction(TR_ResolvedJ9Method * compilee, TR_J9VMBase * vm){
@@ -7937,8 +8047,7 @@ TR::CompilationInfoPerThreadBase::wrappedCompile(J9PortLibrary *portLib, void * 
 	      if(aotflag){
 	      
 		featureExtraction(static_cast<TR_ResolvedJ9Method *> (compilee), static_cast<TR_J9VMBase *> (vm));
-
-	      }
+		}
             // Check if the the method to be compiled is a JSR292 method
             if (TR::CompilationInfo::isJSR292(details.getMethod()))
                {
